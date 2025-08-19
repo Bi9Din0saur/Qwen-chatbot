@@ -1,7 +1,15 @@
 <template>
   <div :class="['message-item', message.type]">
     <div class="message-avatar">
-      {{ message.type === 'user' ? '👤' : '🤖' }}
+      <img
+        v-if="message.type === 'bot'"
+        src="/ai-avatar.svg"
+        alt="AI助手"
+        class="avatar-img"
+        @error="handleAvatarError"
+      />
+      <span v-else-if="message.type === 'user'">👤</span>
+      <span v-else>🤖</span>
     </div>
 
     <div class="message-content">
@@ -28,7 +36,12 @@
 
         <!-- 文本内容 -->
         <div v-if="message.content" class="message-text">
-          {{ message.content }}
+          <div
+            v-if="message.type === 'bot'"
+            v-html="renderedContent"
+            class="markdown-content"
+          ></div>
+          <div v-else>{{ message.content }}</div>
         </div>
 
         <!-- 流式输出指示器 -->
@@ -44,6 +57,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import MarkdownIt from 'markdown-it'
 import type { Message } from '@/stores/chat'
 
 interface Props {
@@ -53,11 +67,30 @@ interface Props {
 
 const props = defineProps<Props>()
 
+// 创建markdown-it实例
+const md = new MarkdownIt({
+  html: true,
+  linkify: true,
+  typographer: true,
+  breaks: true,
+})
+
+// 渲染Markdown内容
+const renderedContent = computed(() => {
+  if (!props.message.content) return ''
+  return md.render(props.message.content)
+})
+
 const getImageSrc = (): string => {
   if (props.message.imageFile) {
     return URL.createObjectURL(props.message.imageFile)
   }
-  return props.message.imageUrl || ''
+  const imageUrl = props.message.imageUrl || ''
+  // 调试信息：检查图片URL
+  if (imageUrl) {
+    console.log(`MessageItem: 获取图片URL:`, imageUrl)
+  }
+  return imageUrl
 }
 
 const formatTime = (timestamp: Date): string => {
@@ -85,6 +118,19 @@ const handleImageLoad = () => {
 const handleImageError = () => {
   // 图片加载失败处理
   console.error('图片加载失败')
+}
+
+const handleAvatarError = (event: Event) => {
+  // 头像加载失败时，隐藏图片，显示emoji
+  const imgElement = event.target as HTMLImageElement
+  if (imgElement) {
+    imgElement.style.display = 'none'
+    // 创建一个span元素显示emoji
+    const spanElement = document.createElement('span')
+    spanElement.textContent = '🤖'
+    spanElement.style.fontSize = '18px'
+    imgElement.parentNode?.appendChild(spanElement)
+  }
 }
 </script>
 
@@ -119,8 +165,17 @@ const handleImageError = () => {
 }
 
 .message-item.bot .message-avatar {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
   color: white;
+  overflow: hidden;
+}
+
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
 }
 
 .message-content {
@@ -142,6 +197,9 @@ const handleImageError = () => {
   margin-bottom: 8px;
   font-size: 12px;
   color: #666;
+  display: flex;
+  align-items: center;
+  min-height: 40px; /* 与头像高度一致 */
 }
 
 .message-author {
@@ -154,7 +212,7 @@ const handleImageError = () => {
 }
 
 .message-body {
-  background: white;
+  background: #f8f9fa;
   border-radius: 18px;
   padding: 12px 16px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
@@ -165,6 +223,11 @@ const handleImageError = () => {
   word-wrap: break-word;
 }
 
+.message-item.bot .message-body {
+  padding: 16px 0;
+  border-radius: 0;
+}
+
 .message-item.user .message-body {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
@@ -172,9 +235,10 @@ const handleImageError = () => {
 }
 
 .message-item.bot .message-body {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-  color: white;
-  box-shadow: 0 2px 8px rgba(240, 147, 251, 0.3);
+  background: #f8f9fa;
+  color: #333333;
+  box-shadow: none;
+  border: none;
 }
 
 .message-image {
@@ -195,12 +259,267 @@ const handleImageError = () => {
   letter-spacing: 0.2px;
 }
 
+/* Markdown内容样式 */
+.markdown-content {
+  line-height: 1.6;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  margin: 12px 0 6px 0;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.markdown-content h1:first-child,
+.markdown-content h2:first-child,
+.markdown-content h3:first-child,
+.markdown-content h4:first-child,
+.markdown-content h5:first-child,
+.markdown-content h6:first-child {
+  margin-top: 0;
+}
+
+.markdown-content h1 {
+  font-size: 20px;
+}
+.markdown-content h2 {
+  font-size: 18px;
+}
+.markdown-content h3 {
+  font-size: 16px;
+}
+.markdown-content h4 {
+  font-size: 15px;
+}
+.markdown-content h5 {
+  font-size: 14px;
+}
+.markdown-content h6 {
+  font-size: 13px;
+}
+
+.markdown-content p {
+  margin: 6px 0;
+  line-height: 1.5;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  margin: 6px 0;
+  padding-left: 20px;
+}
+
+.markdown-content li {
+  margin: 3px 0;
+  line-height: 1.4;
+}
+
+.markdown-content blockquote {
+  margin: 12px 0;
+  padding: 8px 16px;
+  border-left: 4px solid #ddd;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+}
+
+.markdown-content code {
+  background: rgba(0, 0, 0, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+}
+
+.markdown-content pre {
+  background: rgba(0, 0, 0, 0.1);
+  padding: 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 12px 0;
+}
+
+.markdown-content pre code {
+  background: none;
+  padding: 0;
+}
+
+.markdown-content strong {
+  font-weight: 600;
+}
+
+.markdown-content em {
+  font-style: italic;
+}
+
+.markdown-content a {
+  color: #007bff;
+  text-decoration: none;
+}
+
+.markdown-content a:hover {
+  text-decoration: underline;
+}
+
+.markdown-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 12px 0;
+}
+
+.markdown-content th,
+.markdown-content td {
+  border: 1px solid #ddd;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.markdown-content th {
+  background: rgba(0, 0, 0, 0.05);
+  font-weight: 600;
+}
+
+.markdown-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 8px 0;
+}
+
 .message-item.user .message-text {
   text-align: right;
 }
 
 .message-item.bot .message-text {
   text-align: left;
+}
+
+/* AI消息中的Markdown样式调整 */
+.message-item.bot .markdown-content {
+  color: #333333;
+  padding-left: 0;
+}
+
+.message-item.bot .markdown-content h1,
+.message-item.bot .markdown-content h2,
+.message-item.bot .markdown-content h3,
+.message-item.bot .markdown-content h4,
+.message-item.bot .markdown-content h5,
+.message-item.bot .markdown-content h6 {
+  color: #1f2937;
+  margin: 16px 0 8px 0;
+  font-weight: 600;
+}
+
+.message-item.bot .markdown-content h1:first-child,
+.message-item.bot .markdown-content h2:first-child,
+.message-item.bot .markdown-content h3:first-child,
+.message-item.bot .markdown-content h4:first-child,
+.message-item.bot .markdown-content h5:first-child,
+.message-item.bot .markdown-content h6:first-child {
+  margin-top: 0;
+  color: #111827;
+}
+
+.message-item.bot .markdown-content p {
+  margin: 8px 0;
+  line-height: 1.6;
+  color: #374151;
+}
+
+.message-item.bot .markdown-content ul,
+.message-item.bot .markdown-content ol {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.message-item.bot .markdown-content li {
+  margin: 4px 0;
+  line-height: 1.5;
+  color: #374151;
+}
+
+.message-item.bot .markdown-content blockquote {
+  background: #ffffff;
+  border-left: 4px solid #d1d5db;
+  margin: 12px 0;
+  padding: 12px 16px;
+  border-radius: 0 4px 4px 0;
+  color: #6b7280;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.message-item.bot .markdown-content code {
+  background: #ffffff;
+  color: #dc2626;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: 'Courier New', monospace;
+  border: 1px solid #e5e7eb;
+}
+
+.message-item.bot .markdown-content pre {
+  background: #ffffff;
+  padding: 16px;
+  border-radius: 8px;
+  margin: 12px 0;
+  border: 1px solid #e5e7eb;
+  overflow-x: auto;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.message-item.bot .markdown-content pre code {
+  color: #374151;
+  background: none;
+  padding: 0;
+  font-size: 14px;
+}
+
+.message-item.bot .markdown-content strong {
+  color: #111827;
+  font-weight: 600;
+}
+
+.message-item.bot .markdown-content em {
+  color: #6b7280;
+  font-style: italic;
+}
+
+.message-item.bot .markdown-content a {
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.message-item.bot .markdown-content a:hover {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+
+.message-item.bot .markdown-content table {
+  margin: 12px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  width: 100%;
+}
+
+.message-item.bot .markdown-content table th {
+  background: #ffffff;
+  color: #374151;
+  font-weight: 600;
+  border-color: #e5e7eb;
+  padding: 12px 16px;
+}
+
+.message-item.bot .markdown-content table td {
+  border-color: #e5e7eb;
+  color: #374151;
+  padding: 12px 16px;
 }
 
 .streaming-indicator {

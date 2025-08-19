@@ -281,8 +281,11 @@ const sendMessage = async () => {
 }
 
 const scrollToBottom = () => {
+  console.log('执行滚动到底部操作')
+
   // 使用锚点元素滚动，兼容性更好
   if (bottomMarker.value) {
+    console.log('使用bottomMarker滚动')
     // 双层保障：在下一帧再触发，避免布局尚未完成
     requestAnimationFrame(() => {
       bottomMarker.value?.scrollIntoView({
@@ -292,10 +295,13 @@ const scrollToBottom = () => {
       })
     })
   } else if (messagesContainer.value) {
+    console.log('使用messagesContainer滚动')
     messagesContainer.value.scrollTo({
       top: messagesContainer.value.scrollHeight,
       behavior: 'smooth',
     })
+  } else {
+    console.warn('滚动元素未找到')
   }
 }
 
@@ -357,7 +363,12 @@ watch(
 watch(
   () => chatStore.currentSession?.id,
   () => {
-    nextTick(() => scrollToBottom())
+    // 增加延迟确保DOM完全渲染
+    nextTick(() => {
+      setTimeout(() => {
+        scrollToBottom()
+      }, 100)
+    })
   },
   { immediate: true },
 )
@@ -454,6 +465,7 @@ watch(
   position: relative;
   z-index: 5;
   margin-top: 60px; /* 为固定的头部导航栏留出空间 */
+  background: #f8f9fa;
 }
 
 .messages-area {
@@ -463,6 +475,7 @@ watch(
   /* 使用CSS变量动态预留与输入栏一致的空间 */
   padding-bottom: calc(var(--input-area-height, 80px) + 20px);
   position: relative;
+  background: #f8f9fa;
 }
 
 .welcome {
@@ -477,7 +490,7 @@ watch(
 }
 
 .input-area {
-  background: white;
+  background: #f8f9fa;
   border-top: 1px solid #e0e0e0;
   padding: 12px 20px;
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
@@ -511,7 +524,7 @@ watch(
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  background: white;
+  background: #f8f9fa;
 }
 
 .preview-image {
@@ -560,7 +573,7 @@ watch(
   min-height: 40px;
   max-height: 120px;
   font-family: inherit;
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
   transition: all 0.3s ease;
   font-size: 14px;

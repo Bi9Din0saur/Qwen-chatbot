@@ -132,10 +132,23 @@ export const useChatStore = defineStore('chat', () => {
           ...session,
           createdAt: new Date(session.created_at),
           updatedAt: new Date(session.updated_at),
-          messages: session.messages.map((msg: any) => ({
-            ...msg,
-            timestamp: new Date(msg.timestamp),
-          })),
+          messages: session.messages.map((msg: any) => {
+            const mappedMsg = {
+              ...msg,
+              timestamp: new Date(msg.timestamp),
+              // 字段名映射：后端使用下划线，前端使用驼峰
+              imageUrl: msg.image_url,
+              imageFile: undefined, // 历史记录中没有File对象
+            }
+            // 调试信息：检查图片URL映射
+            if (msg.image_url) {
+              console.log(`消息 ${msg.id} 的图片URL映射:`, {
+                original: msg.image_url,
+                mapped: mappedMsg.imageUrl,
+              })
+            }
+            return mappedMsg
+          }),
         }))
 
         console.log('处理后的会话数据:', sessions.value)

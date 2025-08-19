@@ -58,10 +58,11 @@ const startNewChat = () => {
   router.push('/')
 }
 
-const selectSession = (session: ChatSession) => {
+const selectSession = async (session: ChatSession) => {
   // 选择现有会话
   chatStore.currentSession = session
-  router.push('/')
+  // 等待路由跳转完成
+  await router.push('/')
 }
 
 const deleteSession = async (sessionId: string) => {

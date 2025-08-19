@@ -123,7 +123,7 @@ async def chat_with_ai(
                 }
                 
                 messages = [
-                    {"role": "system", "content": "你是一个有帮助的AI助手，请用中文回答用户的问题。"}
+                    {"role": "system", "content": "你是一个有帮助的AI助手，请用中文回答用户的问题，并使用Markdown格式来组织你的回答，包括标题、列表、强调等。"}
                 ]
                 
                 # 添加对话历史
@@ -312,6 +312,10 @@ async def chat_with_ai_stream(
                             
                             messages = [
                                 {
+                                    "role": "system",
+                                    "content": "你是一个专业的图像分析助手，能够准确分析图片内容并回答用户问题。请用中文回答，并使用Markdown格式来组织你的回答，包括标题、列表、强调等。"
+                                },
+                                {
                                     "role": "user",
                                     "content": [
                                         {
@@ -415,7 +419,7 @@ async def chat_with_ai_stream(
                     }
                     
                     messages = [
-                        {"role": "system", "content": "你是一个有帮助的AI助手，请用中文回答用户的问题。"}
+                        {"role": "system", "content": "你是一个有帮助的AI助手，请用中文回答用户的问题，并使用Markdown格式来组织你的回答，包括标题、列表、强调等。"}
                     ]
                     
                     # 添加对话历史
