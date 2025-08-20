@@ -1,17 +1,14 @@
 <template>
-  <div class="chat-container">
-    <div class="chat-header">
-      <div class="header-left">
-        <h1>AI图像识别助手</h1>
-        <div v-if="authStore.user" class="user-info">欢迎，{{ authStore.user.username }}！ 👋</div>
-      </div>
-      <div class="header-actions">
-        <button @click="startNewChat" class="new-chat-btn">+ 新对话</button>
-        <button @click="$router.push('/history')" class="history-btn">📚 历史</button>
-        <button @click="handleLogout" class="logout-btn">🚪 退出</button>
-      </div>
-    </div>
+  <div class="chat-container" :class="{ 'sidebar-collapsed': !sidebarExpanded }">
+    <!-- 侧边栏 -->
+    <Sidebar
+      @toggle="handleSidebarToggle"
+      @newChat="handleNewChat"
+      @selectSession="handleSelectSession"
+      @searchResultSelected="handleSearchResultSelected"
+    />
 
+    <!-- 主聊天区域 -->
     <div class="chat-content">
       <div class="messages-area" ref="messagesContainer">
         <div v-if="!chatStore.currentSession?.messages.length" class="welcome">
@@ -45,6 +42,7 @@
           </div>
 
           <textarea
+            ref="messageInputRef"
             v-model="inputMessage"
             @keydown.enter.prevent="sendMessage"
             :placeholder="getPlaceholderText()"
@@ -70,6 +68,17 @@
         </div>
       </div>
     </div>
+
+    <!-- 返回最新按钮 -->
+    <button
+      v-if="showBackToLatest"
+      @click="scrollToBottom"
+      class="back-to-latest-btn visible"
+      title="返回最新消息"
+    >
+      <span class="icon">⬇️</span>
+      <span>返回最新</span>
+    </button>
   </div>
 </template>
 
@@ -80,6 +89,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
 import ImageUpload from '@/components/ImageUpload.vue'
 import MessageItem from '@/components/MessageItem.vue'
+import Sidebar from '@/components/Sidebar.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -90,7 +100,10 @@ const selectedImage = ref<File | string>()
 const messagesContainer = ref<HTMLElement>()
 const inputAreaRef = ref<HTMLElement>()
 const bottomMarker = ref<HTMLElement>()
+const messageInputRef = ref<HTMLTextAreaElement>()
 const showImageUpload = ref(false)
+const sidebarExpanded = ref(true)
+const showBackToLatest = ref(false)
 
 const canSend = computed(() => {
   return (inputMessage.value.trim() || selectedImage.value) && !chatStore.isLoading
@@ -293,6 +306,10 @@ const scrollToBottom = () => {
         block: 'start',
         inline: 'nearest',
       })
+      // 滚动完成后隐藏按钮
+      setTimeout(() => {
+        showBackToLatest.value = false
+      }, 500)
     })
   } else if (messagesContainer.value) {
     console.log('使用messagesContainer滚动')
@@ -300,8 +317,35 @@ const scrollToBottom = () => {
       top: messagesContainer.value.scrollHeight,
       behavior: 'smooth',
     })
+    // 滚动完成后隐藏按钮
+    setTimeout(() => {
+      showBackToLatest.value = false
+    }, 500)
   } else {
     console.warn('滚动元素未找到')
+  }
+}
+
+// 滚动到指定消息
+const scrollToMessage = (messageId: string) => {
+  console.log('滚动到消息:', messageId)
+
+  // 查找消息元素
+  const messageElement = document.querySelector(`[data-message-id="${messageId}"]`)
+  if (messageElement) {
+    messageElement.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+      inline: 'nearest',
+    })
+
+    // 高亮显示该消息
+    messageElement.classList.add('highlight-message')
+    setTimeout(() => {
+      messageElement.classList.remove('highlight-message')
+    }, 2000)
+  } else {
+    console.warn('未找到消息元素:', messageId)
   }
 }
 
@@ -310,17 +354,57 @@ const handleLogout = async () => {
   router.push('/login')
 }
 
+const handleSidebarToggle = (expanded: boolean) => {
+  sidebarExpanded.value = expanded
+}
+
+// 自动聚焦到输入框的通用函数
+const autoFocusInput = () => {
+  nextTick(() => {
+    // 检查当前会话是否为空，如果是空会话则自动聚焦
+    if (chatStore.currentSession && chatStore.currentSession.messages.length === 0) {
+      messageInputRef.value?.focus()
+    }
+  })
+}
+
+const handleNewChat = () => {
+  autoFocusInput()
+}
+
+const handleSelectSession = (session: any) => {
+  // 当选择会话时，如果是空会话则自动聚焦
+  autoFocusInput()
+}
+
+const handleSearchResultSelected = (result: any) => {
+  // 当选择搜索结果时，自动聚焦并滚动到相关消息
+  autoFocusInput()
+  // 延迟滚动到相关消息，确保DOM已渲染
+  nextTick(() => {
+    setTimeout(() => {
+      scrollToMessage(result.messageId)
+    }, 200)
+  })
+}
+
 const startNewChat = () => {
   chatStore.createNewSession()
   inputMessage.value = ''
   selectedImage.value = undefined
-  nextTick(() => scrollToBottom())
+  nextTick(() => {
+    scrollToBottom()
+    autoFocusInput()
+  })
 }
 
 onMounted(() => {
   if (!chatStore.currentSession) {
     chatStore.createNewSession()
   }
+
+  // 页面加载完成后，如果是空会话则自动聚焦
+  autoFocusInput()
 
   // 计算并同步输入栏高度到CSS变量，供消息区域留白使用
   const updateInputAreaHeight = () => {
@@ -341,6 +425,20 @@ onMounted(() => {
     ;(inputAreaRef as any)._cleanupResize = () =>
       window.removeEventListener('resize', updateInputAreaHeight)
   }
+
+  // 监听消息区域的滚动事件
+  if (messagesContainer.value) {
+    const handleScroll = () => {
+      if (messagesContainer.value) {
+        const { scrollTop, scrollHeight, clientHeight } = messagesContainer.value
+        const isAtBottom = scrollTop + clientHeight >= scrollHeight - 10 // 10px的容差
+        showBackToLatest.value = !isAtBottom
+      }
+    }
+
+    messagesContainer.value.addEventListener('scroll', handleScroll)
+    ;(messagesContainer as any)._scrollHandler = handleScroll
+  }
 })
 
 onUnmounted(() => {
@@ -348,6 +446,12 @@ onUnmounted(() => {
   if (ro && inputAreaRef.value) ro.unobserve(inputAreaRef.value)
   const cleanup = (inputAreaRef as any)._cleanupResize as (() => void) | undefined
   if (cleanup) cleanup()
+
+  // 清理滚动事件监听器
+  const scrollHandler = (messagesContainer as any)._scrollHandler as (() => void) | undefined
+  if (scrollHandler && messagesContainer.value) {
+    messagesContainer.value.removeEventListener('scroll', scrollHandler)
+  }
 })
 
 // 监听消息变化，自动滚动到底部
@@ -359,7 +463,7 @@ watch(
   { deep: true },
 )
 
-// 进入任意会话时（或切换会话）自动滚动到底部
+// 进入任意会话时（或切换会话）自动滚动到底部并聚焦
 watch(
   () => chatStore.currentSession?.id,
   () => {
@@ -367,6 +471,7 @@ watch(
     nextTick(() => {
       setTimeout(() => {
         scrollToBottom()
+        autoFocusInput()
       }, 100)
     })
   },
@@ -378,115 +483,58 @@ watch(
 .chat-container {
   height: 100vh;
   display: flex;
-  flex-direction: column;
   background: #f8f9fa;
   position: relative;
-}
-
-.chat-header {
-  background: white;
-  padding: 12px 20px;
-  border-bottom: 1px solid #e0e0e0;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 10;
-  height: 60px;
-}
-
-.chat-header h1 {
-  margin: 0;
-  color: #333;
-  font-size: 18px;
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.user-info {
-  font-size: 12px;
-  color: #666;
-}
-
-.header-actions {
-  display: flex;
-  gap: 12px;
-}
-
-.new-chat-btn,
-.history-btn,
-.logout-btn {
-  padding: 6px 12px;
-  border: 1px solid #ddd;
-  background: white;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  font-weight: 500;
-  font-size: 12px;
-}
-
-.new-chat-btn:hover {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border-color: transparent;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-}
-
-.history-btn:hover {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border-color: transparent;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-}
-
-.logout-btn:hover {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-  color: white;
-  border-color: transparent;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(240, 147, 251, 0.4);
 }
 
 .chat-content {
   flex: 1;
+  margin-left: 280px; /* 为侧边栏留出空间 */
   display: flex;
   flex-direction: column;
+  transition: margin-left 0.3s ease;
   position: relative;
   z-index: 5;
-  margin-top: 60px; /* 为固定的头部导航栏留出空间 */
   background: #f8f9fa;
+}
+
+/* 当侧边栏收起时的样式 */
+.chat-container.sidebar-collapsed .chat-content {
+  margin-left: 60px;
 }
 
 .messages-area {
   flex: 1;
   overflow-y: auto;
   padding: 20px;
-  /* 使用CSS变量动态预留与输入栏一致的空间 */
-  padding-bottom: calc(var(--input-area-height, 80px) + 20px);
+  /* 为固定的输入框留出空间 */
+  padding-bottom: 100px;
   position: relative;
   background: #f8f9fa;
 }
 
 .welcome {
   text-align: center;
-  padding: 60px 20px;
+  padding: 120px 20px;
   color: #666;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
 }
 
 .welcome h2 {
-  margin: 0 0 16px 0;
+  margin: 0 0 20px 0;
   color: #333;
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.welcome p {
+  font-size: 18px;
+  line-height: 1.6;
+  max-width: 500px;
 }
 
 .input-area {
@@ -496,12 +544,19 @@ watch(
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
   position: fixed;
   bottom: 0;
-  left: 0;
+  left: 280px; /* 为侧边栏留出空间 */
   right: 0;
   z-index: 10;
   min-height: 80px;
   max-height: 200px;
   overflow-y: auto;
+  transition: left 0.3s ease;
+  box-sizing: border-box;
+}
+
+/* 当侧边栏收起时的输入框样式 */
+.chat-container.sidebar-collapsed .input-area {
+  left: 60px;
 }
 
 .text-input {
@@ -711,5 +766,65 @@ watch(
 
 .modal-body {
   padding: 20px;
+}
+
+/* 高亮消息样式 */
+.highlight-message {
+  animation: highlightPulse 2s ease-in-out;
+  border: 2px solid #007bff !important;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0, 123, 255, 0.3);
+}
+
+@keyframes highlightPulse {
+  0%,
+  100% {
+    border-color: #007bff;
+    box-shadow: 0 0 10px rgba(0, 123, 255, 0.3);
+  }
+  50% {
+    border-color: #0056b3;
+    box-shadow: 0 0 20px rgba(0, 123, 255, 0.5);
+  }
+}
+
+/* 返回最新按钮样式 */
+.back-to-latest-btn {
+  position: fixed;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 50px;
+  padding: 12px 20px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  transition: all 0.3s ease;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.back-to-latest-btn.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
+}
+
+.back-to-latest-btn:hover {
+  background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+  transform: translateX(-50%) translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.back-to-latest-btn .icon {
+  font-size: 16px;
 }
 </style>

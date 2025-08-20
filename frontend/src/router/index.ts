@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import Chat from '@/views/Chat.vue'
 import Login from '@/views/Login.vue'
 import History from '@/views/History.vue'
+import UserCenter from '@/views/UserCenter.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -21,6 +22,12 @@ const router = createRouter({
       path: '/history',
       name: 'history',
       component: History,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/user',
+      name: 'user',
+      component: UserCenter,
       meta: { requiresAuth: true },
     },
   ],

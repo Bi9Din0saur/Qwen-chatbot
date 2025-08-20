@@ -1,5 +1,5 @@
 <template>
-  <div :class="['message-item', message.type]">
+  <div :class="['message-item', message.type]" :data-message-id="message.id">
     <div class="message-avatar">
       <img
         v-if="message.type === 'bot'"
