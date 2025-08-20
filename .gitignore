@@ -28,3 +28,7 @@ coverage
 *.sw?
 
 *.tsbuildinfo
+
+# Backend uploads
+backend/uploads/
+backend/uploads/*
