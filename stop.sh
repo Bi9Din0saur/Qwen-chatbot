@@ -1,19 +1,21 @@
 #!/bin/bash
 
-# AI图像识别聊天机器人停止脚本
+echo "🛑 停止聊天机器人项目..."
 
-echo "🛑 停止AI图像识别聊天机器人..."
+# 检查docker-compose.yml是否存在
+if [ ! -f "docker-compose.yml" ]; then
+    echo "❌ docker-compose.yml文件不存在"
+    exit 1
+fi
 
-# 停止后端服务
-echo "📡 停止后端服务..."
-pkill -f "python.*main.py" 2>/dev/null || echo "后端服务未运行"
+# 停止所有服务
+echo "📦 停止Docker服务..."
+docker-compose down
 
-# 停止前端服务
-echo "🌐 停止前端服务..."
-pkill -f "vite" 2>/dev/null || echo "前端服务未运行"
-
-# 停止npm进程
-echo "📦 停止npm进程..."
-pkill -f "npm run dev" 2>/dev/null || echo "npm进程未运行"
-
-echo "✅ 所有服务已停止"
+echo ""
+echo "✅ 项目已停止！"
+echo ""
+echo "📋 其他选项:"
+echo "   - 完全清理(删除数据): docker-compose down -v"
+echo "   - 查看状态: docker-compose ps"
+echo "   - 重新启动: ./start.sh"

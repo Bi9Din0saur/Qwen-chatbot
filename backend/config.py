@@ -6,6 +6,12 @@ class Settings(BaseSettings):
     # 数据库配置
     database_url: str = "mysql+pymysql://username:password@localhost:3306/chatbot_db"
     
+    # Docker数据库配置（可选）
+    mysql_root_password: Optional[str] = None
+    mysql_database: Optional[str] = None
+    mysql_user: Optional[str] = None
+    mysql_password: Optional[str] = None
+    
     # JWT配置
     secret_key: str = "your-secret-key-here-change-in-production"
     algorithm: str = "HS256"
@@ -28,6 +34,6 @@ class Settings(BaseSettings):
     port: int = 8000
     
     class Config:
-        env_file = ".env"
+        env_file = [".env", "../.env"]
 
 settings = Settings()

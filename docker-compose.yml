@@ -1,0 +1,86 @@
+version: "3.8"
+
+services:
+  # MySQL数据库
+  mysql:
+    image: mysql:8.0
+    container_name: chatbot-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-chatbot_db}
+      MYSQL_USER: ${MYSQL_USER:-chatbot_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-chatbot_password}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "3307:3306"
+    networks:
+      - chatbot-network
+
+  # Redis缓存
+  redis:
+    image: redis:7-alpine
+    container_name: chatbot-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - chatbot-network
+
+  # 后端API服务 - 使用预构建镜像
+  backend:
+    image: python:3.11-slim
+    container_name: chatbot-backend
+    restart: unless-stopped
+    working_dir: /app/backend
+    environment:
+      - DATABASE_URL=mysql+pymysql://${MYSQL_USER:-chatbot_user}:${MYSQL_PASSWORD:-chatbot_password}@mysql:3306/${MYSQL_DATABASE:-chatbot_db}
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-here-change-in-production}
+      - QWEN_API_KEY=${QWEN_API_KEY}
+      - REDIS_URL=redis://redis:6379
+      - DEBUG=${DEBUG:-False}
+      - HOST=0.0.0.0
+      - PORT=8000
+    volumes:
+      - ./backend:/app/backend
+      - backend_uploads:/app/backend/uploads
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      - chatbot-network
+    # 使用更稳定的安装命令
+    command: >
+      sh -c "echo 'Installing dependencies...' &&
+             pip install --no-cache-dir --timeout 600 --retries 10 -i https://pypi.tuna.tsinghua.edu.cn/simple fastapi uvicorn python-multipart python-jose[cryptography] passlib[bcrypt] python-dotenv pydantic-settings sqlalchemy pymysql alembic pillow httpx openai redis celery email-validator &&
+             echo 'Dependencies installed successfully!' &&
+             mkdir -p uploads &&
+             echo 'Starting backend service...' &&
+             uvicorn main:app --host 0.0.0.0 --port 8000"
+
+  # 前端服务 - 使用预构建的Nginx镜像
+  frontend:
+    image: nginx:alpine
+    container_name: chatbot-frontend
+    restart: unless-stopped
+    volumes:
+      - ./frontend/dist:/usr/share/nginx/html
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - chatbot-network
+
+volumes:
+  mysql_data:
+  backend_uploads:
+
+networks:
+  chatbot-network:
+    driver: bridge

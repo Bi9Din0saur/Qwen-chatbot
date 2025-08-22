@@ -14,13 +14,16 @@ export const useAuthStore = defineStore('auth', () => {
 
   const login = async (username: string, password: string) => {
     try {
-      // 调用后端登录API
-      const formData = new FormData()
+      // 调用后端登录API - 使用正确的表单格式
+      const formData = new URLSearchParams()
       formData.append('username', username)
       formData.append('password', password)
 
       const response = await fetch('/api/auth/login', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
         body: formData,
       })
 
